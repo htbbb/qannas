@@ -38,6 +38,7 @@ class Playbook:
     payloads: list[str]
     detect_signatures: list[str]
     param_hints: list[str]
+    remediation: str = ""
 
 
 class KnowledgeBase:
@@ -74,6 +75,10 @@ class KnowledgeBase:
             CREATE INDEX IF NOT EXISTS idx_findings_target ON findings(target);
             """
         )
+        # lightweight migration: add columns introduced after first release
+        cols = {r["name"] for r in self.conn.execute("PRAGMA table_info(playbooks)")}
+        if "remediation" not in cols:
+            self.conn.execute("ALTER TABLE playbooks ADD COLUMN remediation TEXT DEFAULT ''")
         self.conn.commit()
 
     def _shipped_version(self) -> int:
@@ -106,6 +111,7 @@ class KnowledgeBase:
                 methodology=pb["methodology"], payloads=pb.get("payloads", []),
                 detect_signatures=pb.get("detect_signatures", []),
                 param_hints=pb.get("param_hints", []),
+                remediation=pb.get("remediation", ""),
             ))
             n += 1
         return n
@@ -113,16 +119,17 @@ class KnowledgeBase:
     def upsert_playbook(self, pb: Playbook) -> None:
         self.conn.execute(
             """INSERT INTO playbooks
-               (vuln_class,title,cwe,owasp,severity,non_destructive,methodology,payloads,detect_signatures,param_hints)
-               VALUES (?,?,?,?,?,?,?,?,?,?)
+               (vuln_class,title,cwe,owasp,severity,non_destructive,methodology,payloads,detect_signatures,param_hints,remediation)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?)
                ON CONFLICT(vuln_class) DO UPDATE SET
                  title=excluded.title, cwe=excluded.cwe, owasp=excluded.owasp,
                  severity=excluded.severity, non_destructive=excluded.non_destructive,
                  methodology=excluded.methodology, payloads=excluded.payloads,
-                 detect_signatures=excluded.detect_signatures, param_hints=excluded.param_hints""",
+                 detect_signatures=excluded.detect_signatures, param_hints=excluded.param_hints,
+                 remediation=excluded.remediation""",
             (pb.vuln_class, pb.title, pb.cwe, pb.owasp, pb.severity,
              int(pb.non_destructive), pb.methodology, json.dumps(pb.payloads),
-             json.dumps(pb.detect_signatures), json.dumps(pb.param_hints)),
+             json.dumps(pb.detect_signatures), json.dumps(pb.param_hints), pb.remediation),
         )
         self.conn.commit()
 
@@ -142,6 +149,7 @@ class KnowledgeBase:
             non_destructive=bool(row["non_destructive"]), methodology=row["methodology"],
             payloads=json.loads(row["payloads"]), detect_signatures=json.loads(row["detect_signatures"]),
             param_hints=json.loads(row["param_hints"]),
+            remediation=(row["remediation"] if "remediation" in row.keys() else "") or "",
         )
 
     # ---- findings memory -------------------------------------------------

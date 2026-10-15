@@ -70,6 +70,13 @@ qannas scan --target-list targets.txt
 qannas ctf -t http://localhost:9000 --brief "find the flag in the web app"
 ```
 
+Open the **web dashboard** for any run (localhost-only, tokened link):
+
+```bash
+qannas view            # newest runs
+qannas view --port 8080
+```
+
 Results land in `qannas_runs/<run-name>/`: `state.json` (live state),
 `report.json`, and `report.md`.
 
@@ -84,7 +91,8 @@ qannas/
   sandbox.py        # Docker isolation for generated PoCs
   kb.py             # SQLite knowledge base + cross-run findings memory
   ctf.py            # ReAct CTF solver (flag regex = win signal)
-  report.py         # JSON + Markdown reports
+  report.py         # JSON + Markdown + CSV reports (CWE/OWASP/remediation)
+  viewer.py         # local web dashboard (qannas view)
   orchestrator.py   # the main loop
   cli.py            # entrypoint
   tools/            # http (scope-checked), recon crawler, nuclei hook

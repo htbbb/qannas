@@ -86,6 +86,17 @@ def cmd_ctf(args) -> int:
     return 1
 
 
+def cmd_view(args) -> int:
+    from .viewer import serve
+    cfg = _load_cfg(args.config)
+    runs_dir = Path(cfg.engine.runs_dir)
+    if not runs_dir.exists():
+        console.print(f"[yellow]No runs directory at {runs_dir} — run a scan first.[/]")
+        return 1
+    serve(runs_dir, host=args.host, port=args.port, open_browser=not args.no_open)
+    return 0
+
+
 def cmd_scope(args) -> int:
     cfg = _load_cfg(args.config)
     guard = ScopeGuard(cfg.scope)
@@ -114,6 +125,12 @@ def main(argv=None) -> int:
     c.add_argument("--max-steps", type=int, default=25)
     c.add_argument("--name", help="run name")
     c.set_defaults(func=cmd_ctf)
+
+    v = sub.add_parser("view", help="open the local web dashboard for scan results")
+    v.add_argument("--host", default="127.0.0.1")
+    v.add_argument("--port", type=int, default=8787)
+    v.add_argument("--no-open", action="store_true", help="don't auto-open a browser")
+    v.set_defaults(func=cmd_view)
 
     sc = sub.add_parser("scope", help="check whether a target is in scope")
     sc.add_argument("-t", "--target", required=True)

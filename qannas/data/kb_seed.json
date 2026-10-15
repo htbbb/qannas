@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "playbooks": [
     {
       "vuln_class": "reflected_xss",
@@ -9,9 +9,27 @@
       "severity": "medium",
       "non_destructive": true,
       "methodology": "Inject a unique marker into each reflected parameter, then check whether it returns in the response unencoded and in an executable context (HTML body, attribute, or script). Escalate from a benign tag marker to context-breaking payloads only to confirm the sink.",
-      "payloads": ["<qnx7391>", "\"'><qnx7391>", "qnx7391\"><svg onload=1>", "javascript:qnx7391"],
-      "detect_signatures": ["<qnx7391>", "qnx7391\">"],
-      "param_hints": ["q", "query", "search", "s", "name", "message", "comment", "redirect"]
+      "payloads": [
+        "<qnx7391>",
+        "\"'><qnx7391>",
+        "qnx7391\"><svg onload=1>",
+        "javascript:qnx7391"
+      ],
+      "detect_signatures": [
+        "<qnx7391>",
+        "qnx7391\">"
+      ],
+      "param_hints": [
+        "q",
+        "query",
+        "search",
+        "s",
+        "name",
+        "message",
+        "comment",
+        "redirect"
+      ],
+      "remediation": "Context-encode all user input on output (HTML entity, attribute, JS, URL encoding as appropriate) and deploy a strict Content-Security-Policy. Prefer framework auto-escaping; never build HTML by string concatenation."
     },
     {
       "vuln_class": "sql_injection",
@@ -21,9 +39,45 @@
       "severity": "high",
       "non_destructive": true,
       "methodology": "Start with a single quote and parenthesis-breakout variants to surface database errors across MySQL, Postgres, SQLite/Sequelize (Node), Oracle and MSSQL. If no error, use a boolean-differential pair (always-true vs always-false) and compare response length/status. Never use destructive payloads (DROP, DELETE, UPDATE).",
-      "payloads": ["'", "''", "')", "'))", "'))--", "')) --", "' OR '1'='1", "' AND '1'='2", "1 OR 1=1", "1 AND 1=2", "\")"],
-      "detect_signatures": ["you have an error in your sql syntax", "warning: mysql", "unclosed quotation mark", "pg_query()", "sqlite3.operationalerror", "sqlite_error", "unrecognized token", "sequelize", "syntax error", "ora-01756", "odbc sql server driver", "sqlstate", "sql error"],
-      "param_hints": ["id", "user", "uid", "pid", "cat", "category", "order", "sort"]
+      "payloads": [
+        "'",
+        "''",
+        "')",
+        "'))",
+        "'))--",
+        "')) --",
+        "' OR '1'='1",
+        "' AND '1'='2",
+        "1 OR 1=1",
+        "1 AND 1=2",
+        "\")"
+      ],
+      "detect_signatures": [
+        "you have an error in your sql syntax",
+        "warning: mysql",
+        "unclosed quotation mark",
+        "pg_query()",
+        "sqlite3.operationalerror",
+        "sqlite_error",
+        "unrecognized token",
+        "sequelize",
+        "syntax error",
+        "ora-01756",
+        "odbc sql server driver",
+        "sqlstate",
+        "sql error"
+      ],
+      "param_hints": [
+        "id",
+        "user",
+        "uid",
+        "pid",
+        "cat",
+        "category",
+        "order",
+        "sort"
+      ],
+      "remediation": "Use parameterized queries / prepared statements or a vetted ORM; never concatenate input into SQL. Apply least-privilege DB accounts and allow-list identifiers (table/column names)."
     },
     {
       "vuln_class": "idor",
@@ -35,7 +89,17 @@
       "methodology": "Object-reference parameters must be tested with TWO authenticated identities: fetch an object as user A, then request the same id as user B. A match proves broken access control. A scanner cannot confirm this alone — flag for auth-context validation.",
       "payloads": [],
       "detect_signatures": [],
-      "param_hints": ["id", "user", "uid", "account", "doc", "order", "invoice", "file"]
+      "param_hints": [
+        "id",
+        "user",
+        "uid",
+        "account",
+        "doc",
+        "order",
+        "invoice",
+        "file"
+      ],
+      "remediation": "Enforce server-side authorization on every object access (verify the current user owns/may access the id). Use unpredictable identifiers and deny-by-default access checks, not client-supplied ids alone."
     },
     {
       "vuln_class": "open_redirect",
@@ -45,9 +109,28 @@
       "severity": "medium",
       "non_destructive": true,
       "methodology": "Set redirect-control parameters to an external canary host and inspect the Location header on 3xx responses. Confirm the canary host appears in Location.",
-      "payloads": ["https://qannas.invalid/", "//qannas.invalid/", "/\\qannas.invalid"],
-      "detect_signatures": ["qannas.invalid"],
-      "param_hints": ["url", "next", "redirect", "return", "returnurl", "dest", "destination", "r", "u", "to", "continue"]
+      "payloads": [
+        "https://qannas.invalid/",
+        "//qannas.invalid/",
+        "/\\qannas.invalid"
+      ],
+      "detect_signatures": [
+        "qannas.invalid"
+      ],
+      "param_hints": [
+        "url",
+        "next",
+        "redirect",
+        "return",
+        "returnurl",
+        "dest",
+        "destination",
+        "r",
+        "u",
+        "to",
+        "continue"
+      ],
+      "remediation": "Do not use user input to build redirect targets. Allow-list permitted destinations or use mapping keys; if external redirects are required, show an interstitial and validate the host against an allow-list."
     },
     {
       "vuln_class": "ssrf",
@@ -57,9 +140,24 @@
       "severity": "high",
       "non_destructive": true,
       "methodology": "URL-accepting server-side fetch parameters should be tested with an out-of-band (OOB) collector canary; confirmation requires observing the inbound request at the collector. Without an OOB listener a scanner can only flag the surface — mark for OOB validation.",
-      "payloads": ["http://qannas-oob.invalid/", "http://169.254.169.254/latest/meta-data/"],
+      "payloads": [
+        "http://qannas-oob.invalid/",
+        "http://169.254.169.254/latest/meta-data/"
+      ],
       "detect_signatures": [],
-      "param_hints": ["url", "uri", "path", "callback", "webhook", "fetch", "image", "src", "proxy", "dest"]
+      "param_hints": [
+        "url",
+        "uri",
+        "path",
+        "callback",
+        "webhook",
+        "fetch",
+        "image",
+        "src",
+        "proxy",
+        "dest"
+      ],
+      "remediation": "Allow-list outbound destinations, resolve and validate hostnames, block internal/link-local ranges (169.254.0.0/16, 127.0.0.0/8, metadata endpoints). Disable unused URL schemes and follow-redirects."
     },
     {
       "vuln_class": "ssti",
@@ -69,9 +167,25 @@
       "severity": "high",
       "non_destructive": true,
       "methodology": "Inject a math marker the template engine would evaluate (e.g. {{7*7}} -> 49). A reflected '49' where the literal was sent proves evaluation. Keep payloads arithmetic-only; never call engine internals.",
-      "payloads": ["{{7*7}}", "${7*7}", "#{7*7}", "<%= 7*7 %>"],
-      "detect_signatures": ["49"],
-      "param_hints": ["name", "template", "q", "search", "message", "title", "content"]
+      "payloads": [
+        "{{7*7}}",
+        "${7*7}",
+        "#{7*7}",
+        "<%= 7*7 %>"
+      ],
+      "detect_signatures": [
+        "49"
+      ],
+      "param_hints": [
+        "name",
+        "template",
+        "q",
+        "search",
+        "message",
+        "title",
+        "content"
+      ],
+      "remediation": "Never pass user input into template source. Use logic-less templates or sandboxed engines, and pass user data strictly as bound context variables, not as template strings."
     },
     {
       "vuln_class": "path_traversal",
@@ -81,9 +195,26 @@
       "severity": "high",
       "non_destructive": true,
       "methodology": "File/path parameters may allow traversal. Request a well-known read-only file via traversal sequences and look for its signature in the response. Read-only probing only; never write or include remote resources.",
-      "payloads": ["../../../../etc/passwd", "....//....//etc/passwd", "%2e%2e%2f%2e%2e%2fetc%2fpasswd"],
-      "detect_signatures": ["root:x:0:0:", "daemon:x:"],
-      "param_hints": ["file", "path", "page", "doc", "template", "include", "download", "name"]
+      "payloads": [
+        "../../../../etc/passwd",
+        "....//....//etc/passwd",
+        "%2e%2e%2f%2e%2e%2fetc%2fpasswd"
+      ],
+      "detect_signatures": [
+        "root:x:0:0:",
+        "daemon:x:"
+      ],
+      "param_hints": [
+        "file",
+        "path",
+        "page",
+        "doc",
+        "template",
+        "include",
+        "download",
+        "name"
+      ],
+      "remediation": "Resolve and canonicalize paths, then confirm they stay within an allowed base directory. Reject traversal sequences and absolute paths; prefer opaque file identifiers mapped server-side."
     },
     {
       "vuln_class": "security_headers",
@@ -94,8 +225,14 @@
       "non_destructive": true,
       "methodology": "Inspect the origin's response for the baseline hardening headers. This is an origin-level property — report once per origin, not per URL.",
       "payloads": [],
-      "detect_signatures": ["content-security-policy", "x-frame-options", "strict-transport-security", "x-content-type-options"],
-      "param_hints": []
+      "detect_signatures": [
+        "content-security-policy",
+        "x-frame-options",
+        "strict-transport-security",
+        "x-content-type-options"
+      ],
+      "param_hints": [],
+      "remediation": "Add Content-Security-Policy, X-Frame-Options (or CSP frame-ancestors), Strict-Transport-Security, and X-Content-Type-Options at the edge/app for every response."
     }
   ]
 }

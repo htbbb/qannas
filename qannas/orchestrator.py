@@ -75,7 +75,7 @@ class Orchestrator:
             elif action.kind == "report":
                 break
         self.bb.phase = Phase.REPORT
-        paths = write_reports(self.bb)
+        paths = write_reports(self.bb, self.kb)
 
         # Persist confirmed findings to the cross-run memory so the next scan
         # of this target knows its history.
@@ -87,9 +87,39 @@ class Orchestrator:
         self.bb.phase = Phase.DONE
 
         snap = self.bb.snapshot()
-        console.print(f"[bold green]done[/] · {snap['confirmed']} confirmed / "
-                      f"{snap['findings']} total across {snap['endpoints']} endpoints")
-        console.print(f"[dim]report: {paths['markdown']}[/]")
+        self._print_summary()
+        console.print(f"[dim]reports: {paths['markdown']}  ·  {paths['csv']}[/]")
+        console.print(f"[dim]view dashboard:[/] [cyan]qannas view {self.bb.run_dir.name}[/]")
         self.ctx.http.close()
         self.kb.close()
         return {"snapshot": snap, "reports": {k: str(v) for k, v in paths.items()}}
+
+    def _print_summary(self) -> None:
+        from rich.table import Table
+        from rich.panel import Panel
+
+        sev_color = {"critical": "bold red", "high": "red", "medium": "yellow",
+                     "low": "cyan", "info": "dim"}
+        confirmed = [f for f in self.bb.findings if f.status == "confirmed"]
+        needs = [f for f in self.bb.findings if f.status == "needs_human"]
+        rejected = [f for f in self.bb.findings if f.status == "rejected"]
+
+        if confirmed or needs:
+            t = Table(title="Findings", title_style="bold", show_lines=False, expand=False)
+            t.add_column("SEV"); t.add_column("Class"); t.add_column("Endpoint", overflow="fold")
+            t.add_column("Status")
+            order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+            for f in sorted(confirmed + needs, key=lambda x: order.get(x.severity, 9)):
+                c = sev_color.get(f.severity, "white")
+                st = "[green]confirmed[/]" if f.status == "confirmed" else "[yellow]needs review[/]"
+                t.add_row(f"[{c}]{f.severity.upper()}[/]", f.vuln_class, f.endpoint, st)
+            console.print(t)
+
+        rate = (len(confirmed) / (len(confirmed) + len(rejected)) * 100) if (confirmed or rejected) else 100.0
+        console.print(Panel.fit(
+            f"[bold green]{len(confirmed)}[/] confirmed   "
+            f"[yellow]{len(needs)}[/] needs review   "
+            f"[dim]{len(rejected)} false positives filtered[/]\n"
+            f"endpoints: {len(self.bb.endpoints)}   "
+            f"validated-vulnerability-rate: [bold]{rate:.0f}%[/]",
+            title="Qannas summary", border_style="green"))
