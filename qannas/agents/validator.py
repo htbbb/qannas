@@ -51,11 +51,17 @@ class ValidatorAgent:
                 else ("rejected", "marker not reflected on replay")
 
         if f.vuln_class == "sql_injection":
-            param = "id"
-            url = f.poc.replace("GET ", "") if f.poc else _with_param(f.endpoint, param, "'")
+            url = f.poc.replace("GET ", "") if f.poc else _with_param(f.endpoint, "id", "'")
             r = self.ctx.http.get(url)
             body = r.text.lower()
-            hit = next((s for s in SQL_ERRORS if s in body), None)
+            # Prefer the (broader, maintained) KB signatures; fall back to the
+            # built-in list so the check works even without a KB.
+            sigs = SQL_ERRORS
+            if self.ctx.kb:
+                pb = self.ctx.kb.get("sql_injection")
+                if pb and pb.detect_signatures:
+                    sigs = pb.detect_signatures
+            hit = next((s for s in sigs if s.lower() in body), None)
             return ("confirmed", f"db error replayed: '{hit}'") if hit else ("rejected", "no error on replay")
 
         if f.vuln_class == "open_redirect":

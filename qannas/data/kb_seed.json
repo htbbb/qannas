@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "playbooks": [
     {
       "vuln_class": "reflected_xss",
@@ -20,9 +20,9 @@
       "owasp": "A03:2021-Injection",
       "severity": "high",
       "non_destructive": true,
-      "methodology": "Start with a single quote to surface database errors. If no error, use a boolean-differential pair (always-true vs always-false) and compare response length/status. Never use destructive payloads (DROP, DELETE, UPDATE).",
-      "payloads": ["'", "''", "' OR '1'='1", "' AND '1'='2", "1 OR 1=1", "1 AND 1=2"],
-      "detect_signatures": ["you have an error in your sql syntax", "warning: mysql", "unclosed quotation mark", "pg_query()", "sqlite3.operationalerror", "ora-01756", "odbc sql server driver", "sqlstate"],
+      "methodology": "Start with a single quote and parenthesis-breakout variants to surface database errors across MySQL, Postgres, SQLite/Sequelize (Node), Oracle and MSSQL. If no error, use a boolean-differential pair (always-true vs always-false) and compare response length/status. Never use destructive payloads (DROP, DELETE, UPDATE).",
+      "payloads": ["'", "''", "')", "'))", "'))--", "')) --", "' OR '1'='1", "' AND '1'='2", "1 OR 1=1", "1 AND 1=2", "\")"],
+      "detect_signatures": ["you have an error in your sql syntax", "warning: mysql", "unclosed quotation mark", "pg_query()", "sqlite3.operationalerror", "sqlite_error", "unrecognized token", "sequelize", "syntax error", "ora-01756", "odbc sql server driver", "sqlstate", "sql error"],
       "param_hints": ["id", "user", "uid", "pid", "cat", "category", "order", "sort"]
     },
     {

@@ -47,8 +47,13 @@ class KnowledgeBase:
         self.conn = sqlite3.connect(str(self.path))
         self.conn.row_factory = sqlite3.Row
         self._init_schema()
-        if not self._count("playbooks"):
+        # Seed on first use, and RE-seed (upsert) whenever the shipped seed
+        # version is newer than what's stored — so KB updates reach an existing
+        # DB on the next run after a `git pull`, without wiping findings history.
+        shipped = self._shipped_version()
+        if not self._count("playbooks") or shipped > self._stored_version():
             self.seed()
+            self._set_meta("seed_version", str(shipped))
 
     def _init_schema(self) -> None:
         self.conn.executescript(
@@ -65,9 +70,24 @@ class KnowledgeBase:
                 ts REAL, target TEXT, endpoint TEXT, vuln_class TEXT,
                 severity TEXT, status TEXT, evidence TEXT
             );
+            CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
             CREATE INDEX IF NOT EXISTS idx_findings_target ON findings(target);
             """
         )
+        self.conn.commit()
+
+    def _shipped_version(self) -> int:
+        raw = resources.files("qannas.data").joinpath("kb_seed.json").read_text()
+        return int(json.loads(raw).get("version", 1))
+
+    def _stored_version(self) -> int:
+        row = self.conn.execute("SELECT value FROM meta WHERE key='seed_version'").fetchone()
+        return int(row["value"]) if row else 0
+
+    def _set_meta(self, key: str, value: str) -> None:
+        self.conn.execute(
+            "INSERT INTO meta (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (key, value))
         self.conn.commit()
 
     def _count(self, table: str) -> int:
