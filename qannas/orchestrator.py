@@ -109,7 +109,7 @@ class Orchestrator:
 
         snap = self.bb.snapshot()
         self._print_summary()
-        console.print(f"[dim]reports: {paths['markdown']}  ·  {paths['csv']}[/]")
+        console.print(f"[dim]reports: {paths['markdown']}  ·  {paths['csv']}  ·  {paths.get('sarif','')}[/]")
         console.print(f"[dim]view dashboard:[/] [cyan]qannas view {self.bb.run_dir.name}[/]")
         self.ctx.http.close()
         self.kb.close()

@@ -78,14 +78,28 @@ class ValidatorAgent:
                 else ("rejected", "redirect not reproduced")
 
         # Generic KB-signature replay for any other class with a stored PoC
-        # (ssti, path_traversal, ...). Independent reproduction, clean context.
+        # (nosql, path_traversal, information_disclosure, ...). Independent
+        # reproduction, clean context.
         if f.poc and self.ctx.kb:
             pb = self.ctx.kb.get(f.vuln_class)
             if pb and pb.detect_signatures:
                 url = f.poc.replace("GET ", "")
                 r = self.ctx.http.get(url)
                 body = r.text.lower()
-                hit = next((s for s in pb.detect_signatures if s.lower() in body), None)
+                sigs = [s.lower() for s in pb.detect_signatures]
+
+                if f.vuln_class == "header_injection":
+                    keys = " ".join(r.headers.keys()).lower()
+                    hit = next((s for s in sigs if s in keys), None)
+                    return ("confirmed", f"injected header replayed: '{hit}'") if hit \
+                        else ("rejected", "no injected header on replay (value-only reflection)")
+
+                if f.vuln_class == "xxe":
+                    exp = any(s in body for s in sigs) and "<!entity" not in body
+                    return ("confirmed", "entity expansion replayed") if exp \
+                        else ("rejected", "xxe not reproduced (reflection only)")
+
+                hit = next((s for s in sigs if s in body), None)
                 if f.vuln_class == "ssti":
                     literal = url.split("=")[-1].lower()
                     if hit and literal not in body:

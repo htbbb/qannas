@@ -78,7 +78,8 @@ qannas view --port 8080
 ```
 
 Results land in `qannas_runs/<run-name>/`: `state.json` (live state),
-`report.json`, and `report.md`.
+`report.json`, `report.md`, `findings.csv`, and `report.sarif.json`
+(SARIF 2.1.0 — importable into GitHub code scanning).
 
 ## Layout
 

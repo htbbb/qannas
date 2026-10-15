@@ -18,10 +18,22 @@ SEV_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
 CONFIDENCE = {"confirmed": "High", "needs_human": "Medium", "candidate": "Low"}
 
 
+def _dedupe(findings):
+    seen, out = set(), []
+    for f in findings:
+        k = (f.vuln_class, f.endpoint, f.status)
+        if k in seen:
+            continue
+        seen.add(k)
+        out.append(f)
+    return out
+
+
 def write_reports(bb: Blackboard, kb=None) -> dict[str, Path]:
-    confirmed = [f for f in bb.findings if f.status == "confirmed"]
-    needs_human = [f for f in bb.findings if f.status == "needs_human"]
+    confirmed = _dedupe([f for f in bb.findings if f.status == "confirmed"])
+    needs_human = _dedupe([f for f in bb.findings if f.status == "needs_human"])
     rejected = [f for f in bb.findings if f.status == "rejected"]
+    coverage = sorted({c for e in bb.endpoints.values() for c in e.tested_classes})
 
     def enrich(f):
         pb = kb.get(f.vuln_class) if kb else None
@@ -42,10 +54,16 @@ def write_reports(bb: Blackboard, kb=None) -> dict[str, Path]:
             "needs_human": len(needs_human),
             "rejected_false_positives": len(rejected),
             "by_severity": _severity_counts(confirmed),
+            "coverage_classes": coverage,
+            "coverage_count": len(coverage),
         },
         "confirmed": [enrich(f) for f in _sorted(confirmed)],
         "needs_human": [enrich(f) for f in needs_human],
     }, indent=2))
+
+    # SARIF 2.1.0 — importable into GitHub code scanning and SARIF viewers.
+    sarif_path = bb.run_dir / "report.sarif.json"
+    sarif_path.write_text(json.dumps(_sarif(confirmed + needs_human, kb), indent=2))
 
     # CSV index (Strix-style): id,title,severity,status,endpoint
     csv_path = bb.run_dir / "findings.csv"
@@ -58,8 +76,42 @@ def write_reports(bb: Blackboard, kb=None) -> dict[str, Path]:
                         f.severity.upper(), f.status, f.endpoint])
 
     md_path = bb.run_dir / "report.md"
-    md_path.write_text(_markdown(bb, confirmed, needs_human, rejected, kb))
-    return {"json": json_path, "markdown": md_path, "csv": csv_path}
+    md_path.write_text(_markdown(bb, confirmed, needs_human, rejected, kb, coverage))
+    return {"json": json_path, "markdown": md_path, "csv": csv_path, "sarif": sarif_path}
+
+
+_SARIF_LEVEL = {"critical": "error", "high": "error", "medium": "warning",
+                "low": "note", "info": "note"}
+
+
+def _sarif(findings, kb) -> dict:
+    rules, rule_ids = [], set()
+    results = []
+    for f in findings:
+        pb = kb.get(f.vuln_class) if kb else None
+        if f.vuln_class not in rule_ids:
+            rule_ids.add(f.vuln_class)
+            rules.append({
+                "id": f.vuln_class,
+                "name": (pb.title if pb else f.vuln_class).replace(" ", ""),
+                "shortDescription": {"text": pb.title if pb else f.vuln_class},
+                "properties": {"cwe": pb.cwe if pb else "", "owasp": pb.owasp if pb else "",
+                               "security-severity": {"critical": "9.5", "high": "8.0",
+                               "medium": "5.5", "low": "3.0", "info": "1.0"}.get(f.severity, "1.0")},
+            })
+        results.append({
+            "ruleId": f.vuln_class,
+            "level": _SARIF_LEVEL.get(f.severity, "note"),
+            "message": {"text": f"{f.detail}. {f.evidence}".strip()},
+            "locations": [{"physicalLocation": {"artifactLocation": {"uri": f.endpoint}}}],
+            "properties": {"status": f.status, "poc": f.poc},
+        })
+    return {
+        "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [{"tool": {"driver": {"name": "Qannas", "informationUri":
+                 "https://github.com/htbbb/qannas", "rules": rules}}, "results": results}],
+    }
 
 
 def _sorted(items):
@@ -73,10 +125,11 @@ def _severity_counts(findings) -> dict:
     return out
 
 
-def _markdown(bb, confirmed, needs_human, rejected, kb) -> str:
+def _markdown(bb, confirmed, needs_human, rejected, kb, coverage=None) -> str:
     L = ["# Qannas assessment report", ""]
     L += [f"- **Target(s):** {', '.join(bb.targets)}",
           f"- **Endpoints mapped:** {len(bb.endpoints)}",
+          f"- **Vulnerability classes tested:** {len(coverage or [])}",
           f"- **Confirmed:** {len(confirmed)}  ·  **Needs review:** {len(needs_human)}"
           f"  ·  **False positives filtered:** {len(rejected)}"]
     sc = _severity_counts(confirmed)
