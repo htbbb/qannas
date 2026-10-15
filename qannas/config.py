@@ -39,6 +39,8 @@ class EngineConfig:
     request_timeout: int = 15
     rate_limit_per_sec: float = 4.0
     runs_dir: str = "qannas_runs"
+    max_total_requests: int = 5000   # budget: hard cap on HTTP requests per run
+    max_seconds: int = 1800          # budget: wall-clock cap per run
 
 
 @dataclass

@@ -29,7 +29,8 @@ def _dedupe(findings):
     return out
 
 
-def write_reports(bb: Blackboard, kb=None) -> dict[str, Path]:
+def write_reports(bb: Blackboard, kb=None, chains=None) -> dict[str, Path]:
+    chains = chains or []
     confirmed = _dedupe([f for f in bb.findings if f.status == "confirmed"])
     needs_human = _dedupe([f for f in bb.findings if f.status == "needs_human"])
     rejected = [f for f in bb.findings if f.status == "rejected"]
@@ -57,6 +58,9 @@ def write_reports(bb: Blackboard, kb=None) -> dict[str, Path]:
             "coverage_classes": coverage,
             "coverage_count": len(coverage),
         },
+        "technologies": bb.technologies,
+        "chains": [{"title": c.title, "severity": c.severity,
+                    "narrative": c.narrative, "components": c.components} for c in chains],
         "confirmed": [enrich(f) for f in _sorted(confirmed)],
         "needs_human": [enrich(f) for f in needs_human],
     }, indent=2))
@@ -76,7 +80,7 @@ def write_reports(bb: Blackboard, kb=None) -> dict[str, Path]:
                         f.severity.upper(), f.status, f.endpoint])
 
     md_path = bb.run_dir / "report.md"
-    md_path.write_text(_markdown(bb, confirmed, needs_human, rejected, kb, coverage))
+    md_path.write_text(_markdown(bb, confirmed, needs_human, rejected, kb, coverage, chains))
     return {"json": json_path, "markdown": md_path, "csv": csv_path, "sarif": sarif_path}
 
 
@@ -125,18 +129,28 @@ def _severity_counts(findings) -> dict:
     return out
 
 
-def _markdown(bb, confirmed, needs_human, rejected, kb, coverage=None) -> str:
+def _markdown(bb, confirmed, needs_human, rejected, kb, coverage=None, chains=None) -> str:
+    chains = chains or []
     L = ["# Qannas assessment report", ""]
     L += [f"- **Target(s):** {', '.join(bb.targets)}",
           f"- **Endpoints mapped:** {len(bb.endpoints)}",
           f"- **Vulnerability classes tested:** {len(coverage or [])}",
           f"- **Confirmed:** {len(confirmed)}  ·  **Needs review:** {len(needs_human)}"
           f"  ·  **False positives filtered:** {len(rejected)}"]
+    if bb.technologies:
+        L.append(f"- **Technologies:** {', '.join(bb.technologies)}")
     sc = _severity_counts(confirmed)
     if sc:
         L.append("- **By severity:** " + ", ".join(f"{k.upper()}: {v}" for k, v in
                  sorted(sc.items(), key=lambda kv: SEV_ORDER.get(kv[0], 9))))
     L.append("")
+
+    if chains:
+        L += ["## Attack chains", ""]
+        for c in sorted(chains, key=lambda x: SEV_ORDER.get(x.severity, 9)):
+            L += [f"### [{c.severity.upper()}] {c.title}",
+                  f"- Components: {', '.join(c.components)}",
+                  f"- {c.narrative}", ""]
 
     if confirmed:
         L += ["## Confirmed findings", ""]

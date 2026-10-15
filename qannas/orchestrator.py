@@ -78,12 +78,25 @@ class Orchestrator:
         return self._run_loop()
 
     def _run_loop(self) -> dict:
+        import time as _t
         console.print(f"[bold cyan]Qannas[/] starting on {', '.join(self.bb.targets)}")
         console.print(f"[dim]run dir: {self.bb.run_dir}[/]")
+        start = _t.time()
+        budget = self.cfg.engine
         while True:
+            # Budget policy: stop gracefully on request or time cap.
+            if self.ctx.http.request_count >= budget.max_total_requests:
+                self.bb.note(f"budget: request cap ({budget.max_total_requests}) reached")
+                console.print("[yellow]budget[/] · request cap reached, finalizing")
+                break
+            if _t.time() - start >= budget.max_seconds:
+                self.bb.note(f"budget: time cap ({budget.max_seconds}s) reached")
+                console.print("[yellow]budget[/] · time cap reached, finalizing")
+                break
             action = self.planner.next_action(self.bb)
             if action.kind == "recon":
                 self.recon.run()
+                self._fingerprint()
             elif action.kind == "exploit":
                 console.print(f"[yellow]exploit[/] · {action.detail}")
                 if action.detail == "dom_xss":
@@ -96,7 +109,19 @@ class Orchestrator:
             elif action.kind == "report":
                 break
         self.bb.phase = Phase.REPORT
-        paths = write_reports(self.bb, self.kb)
+
+        # Chaining, reports, transaction log, fixes, PDF.
+        from .chaining import find_chains
+        from .fixes import write_fixes
+        from . import report_pdf
+        chains = find_chains(self.bb.findings)
+        paths = write_reports(self.bb, self.kb, chains)
+        self._write_transactions()
+        write_fixes(self.bb.run_dir, self.bb.findings, self.kb, self.ctx.llm)
+        try:
+            report_pdf.write_pdf(self.bb.run_dir, self.bb, self.kb, chains)
+        except Exception as e:
+            self.bb.note(f"pdf skipped: {e}")
 
         # Persist confirmed findings to the cross-run memory so the next scan
         # of this target knows its history.
@@ -109,11 +134,38 @@ class Orchestrator:
 
         snap = self.bb.snapshot()
         self._print_summary()
-        console.print(f"[dim]reports: {paths['markdown']}  ·  {paths['csv']}  ·  {paths.get('sarif','')}[/]")
+        if chains:
+            console.print(f"[bold red]attack chains:[/] {len(chains)} — see report")
+        if self.bb.technologies:
+            console.print(f"[dim]tech:[/] {', '.join(self.bb.technologies[:6])}")
+        console.print(f"[dim]reports: report.md · findings.csv · report.sarif.json · "
+                      f"report.pdf · fixes.md[/]")
         console.print(f"[dim]view dashboard:[/] [cyan]qannas view {self.bb.run_dir.name}[/]")
         self.ctx.http.close()
         self.kb.close()
-        return {"snapshot": snap, "reports": {k: str(v) for k, v in paths.items()}}
+        return {"snapshot": snap, "reports": {k: str(v) for k, v in paths.items()},
+                "chains": len(chains)}
+
+    def _fingerprint(self) -> None:
+        if self.bb.technologies or not self.bb.targets:
+            return
+        try:
+            from .tech import fingerprint
+            r = self.ctx.http.get(self.bb.targets[0])
+            self.bb.technologies = fingerprint(r.headers, r.text)
+            if self.bb.technologies:
+                self.bb.note("tech: " + ", ".join(self.bb.technologies))
+        except Exception:
+            pass
+
+    def _write_transactions(self) -> None:
+        import json as _j
+        try:
+            with (self.bb.run_dir / "transactions.jsonl").open("w") as fh:
+                for tx in self.ctx.http.transactions:
+                    fh.write(_j.dumps(tx) + "\n")
+        except Exception:
+            pass
 
     def _print_summary(self) -> None:
         from rich.table import Table

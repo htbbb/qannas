@@ -61,10 +61,43 @@ def cmd_scan(args) -> int:
     if not targets and not seed:
         console.print("[red]No targets given.[/]")
         return 2
+
+    # Parallel multi-target (agents-graph-lite): one scanner per target,
+    # run concurrently, each with its own blackboard and run directory.
+    if args.parallel and len(targets) > 1 and not seed:
+        return _scan_parallel(cfg, targets, args.browser)
+
     orch = Orchestrator(cfg, targets, run_name=args.name, seed_endpoints=seed,
                         use_browser=args.browser)
     result = orch.run()
     return 1 if result["snapshot"]["confirmed"] else 0
+
+
+def _scan_parallel(cfg, targets, use_browser) -> int:
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    import re
+    console.print(f"[cyan]parallel scan[/] · {len(targets)} targets")
+
+    def work(t):
+        slug = re.sub(r"[^a-z0-9]+", "-", t.lower()).strip("-")[:40]
+        name = f"{slug}-{int(__import__('time').time())}"
+        # Build AND run inside the worker thread so the SQLite connection is
+        # created and used on the same thread.
+        orch = Orchestrator(cfg, [t], run_name=name, use_browser=use_browser)
+        return t, orch.run()
+
+    worst = 0
+    with ThreadPoolExecutor(max_workers=min(4, len(targets))) as ex:
+        futs = [ex.submit(work, t) for t in targets]
+        for fu in as_completed(futs):
+            try:
+                t, res = fu.result()
+                c = res["snapshot"]["confirmed"]
+                console.print(f"  [green]✓[/] {t}: {c} confirmed  →  qannas view")
+                worst = max(worst, 1 if c else 0)
+            except Exception as e:
+                console.print(f"  [red]✗[/] {e}")
+    return worst
 
 
 def cmd_ctf(args) -> int:
@@ -119,6 +152,8 @@ def main(argv=None) -> int:
     s.add_argument("--endpoints", help="plain text file, one 'METHOD url' per line")
     s.add_argument("--browser", action="store_true",
                    help="render SPAs with headless Chromium + test DOM XSS (needs playwright)")
+    s.add_argument("--parallel", action="store_true",
+                   help="scan multiple targets concurrently (one scanner per target)")
     s.add_argument("--name", help="run name")
     s.set_defaults(func=cmd_scan)
 

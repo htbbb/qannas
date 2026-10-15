@@ -58,6 +58,7 @@ class Blackboard:
         self.endpoints: dict[str, Endpoint] = {}
         self.findings: list[Finding] = []
         self.notes: list[str] = []
+        self.technologies: list[str] = []
         self.iteration: int = 0
 
     # ---- endpoints -------------------------------------------------------

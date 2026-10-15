@@ -15,6 +15,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
 browser = ["playwright>=1.40"]
+pdf = ["reportlab>=4.0"]
 
 [project.scripts]
 qannas = "qannas.cli:main"

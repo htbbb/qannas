@@ -95,6 +95,10 @@ qannas/
   report.py         # JSON + Markdown + CSV reports (CWE/OWASP/remediation)
   viewer.py         # local web dashboard (qannas view)
   tools/browser.py  # headless Chromium: SPA recon + DOM XSS (optional)
+  chaining.py       # vulnerability-chaining rule engine
+  tech.py           # technology fingerprinting
+  fixes.py          # remediation / auto-fix suggestions
+  report_pdf.py     # PDF report (optional, reportlab)
   orchestrator.py   # the main loop
   cli.py            # entrypoint
   tools/            # http (scope-checked), recon crawler, nuclei hook
