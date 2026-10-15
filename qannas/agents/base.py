@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from ..blackboard import Blackboard
 from ..config import Config
+from ..kb import KnowledgeBase
 from ..llm import LLM
 from ..tools.http import HttpTool
 
@@ -15,3 +16,4 @@ class AgentContext:
     bb: Blackboard
     llm: LLM
     http: HttpTool
+    kb: KnowledgeBase | None = None

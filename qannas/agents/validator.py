@@ -65,4 +65,21 @@ class ValidatorAgent:
             return ("confirmed", f"redirect replayed: {loc}") if "qannas.invalid" in loc \
                 else ("rejected", "redirect not reproduced")
 
+        # Generic KB-signature replay for any other class with a stored PoC
+        # (ssti, path_traversal, ...). Independent reproduction, clean context.
+        if f.poc and self.ctx.kb:
+            pb = self.ctx.kb.get(f.vuln_class)
+            if pb and pb.detect_signatures:
+                url = f.poc.replace("GET ", "")
+                r = self.ctx.http.get(url)
+                body = r.text.lower()
+                hit = next((s for s in pb.detect_signatures if s.lower() in body), None)
+                if f.vuln_class == "ssti":
+                    literal = url.split("=")[-1].lower()
+                    if hit and literal not in body:
+                        return "confirmed", f"template evaluation replayed ('{hit}')"
+                    return "rejected", "ssti not reproduced on replay"
+                return ("confirmed", f"signature replayed: '{hit}'") if hit \
+                    else ("rejected", "signature not reproduced on replay")
+
         return "rejected", "no validator for this class"

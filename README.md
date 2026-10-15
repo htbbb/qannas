@@ -82,12 +82,14 @@ qannas/
   planner.py        # deterministic phase machine (the long-horizon fix)
   llm.py            # litellm wrapper + offline mock model
   sandbox.py        # Docker isolation for generated PoCs
+  kb.py             # SQLite knowledge base + cross-run findings memory
   ctf.py            # ReAct CTF solver (flag regex = win signal)
   report.py         # JSON + Markdown reports
   orchestrator.py   # the main loop
   cli.py            # entrypoint
   tools/            # http (scope-checked), recon crawler, nuclei hook
-  agents/           # recon · exploit · validator (separate contexts)
+  agents/           # recon · ai_exploit (KB+LLM) · validator (separate contexts)
+  data/             # kb_seed.json — seed vulnerability playbooks
 tests/              # scope + blackboard + planner unit tests
 ```
 

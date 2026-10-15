@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "playbooks": [
+    {
+      "vuln_class": "reflected_xss",
+      "title": "Reflected Cross-Site Scripting",
+      "cwe": "CWE-79",
+      "owasp": "A03:2021-Injection",
+      "severity": "medium",
+      "non_destructive": true,
+      "methodology": "Inject a unique marker into each reflected parameter, then check whether it returns in the response unencoded and in an executable context (HTML body, attribute, or script). Escalate from a benign tag marker to context-breaking payloads only to confirm the sink.",
+      "payloads": ["<qnx7391>", "\"'><qnx7391>", "qnx7391\"><svg onload=1>", "javascript:qnx7391"],
+      "detect_signatures": ["<qnx7391>", "qnx7391\">"],
+      "param_hints": ["q", "query", "search", "s", "name", "message", "comment", "redirect"]
+    },
+    {
+      "vuln_class": "sql_injection",
+      "title": "SQL Injection (error + boolean)",
+      "cwe": "CWE-89",
+      "owasp": "A03:2021-Injection",
+      "severity": "high",
+      "non_destructive": true,
+      "methodology": "Start with a single quote to surface database errors. If no error, use a boolean-differential pair (always-true vs always-false) and compare response length/status. Never use destructive payloads (DROP, DELETE, UPDATE).",
+      "payloads": ["'", "''", "' OR '1'='1", "' AND '1'='2", "1 OR 1=1", "1 AND 1=2"],
+      "detect_signatures": ["you have an error in your sql syntax", "warning: mysql", "unclosed quotation mark", "pg_query()", "sqlite3.operationalerror", "ora-01756", "odbc sql server driver", "sqlstate"],
+      "param_hints": ["id", "user", "uid", "pid", "cat", "category", "order", "sort"]
+    },
+    {
+      "vuln_class": "idor",
+      "title": "Insecure Direct Object Reference",
+      "cwe": "CWE-639",
+      "owasp": "A01:2021-Broken Access Control",
+      "severity": "high",
+      "non_destructive": true,
+      "methodology": "Object-reference parameters must be tested with TWO authenticated identities: fetch an object as user A, then request the same id as user B. A match proves broken access control. A scanner cannot confirm this alone — flag for auth-context validation.",
+      "payloads": [],
+      "detect_signatures": [],
+      "param_hints": ["id", "user", "uid", "account", "doc", "order", "invoice", "file"]
+    },
+    {
+      "vuln_class": "open_redirect",
+      "title": "Open Redirect",
+      "cwe": "CWE-601",
+      "owasp": "A01:2021-Broken Access Control",
+      "severity": "medium",
+      "non_destructive": true,
+      "methodology": "Set redirect-control parameters to an external canary host and inspect the Location header on 3xx responses. Confirm the canary host appears in Location.",
+      "payloads": ["https://qannas.invalid/", "//qannas.invalid/", "/\\qannas.invalid"],
+      "detect_signatures": ["qannas.invalid"],
+      "param_hints": ["url", "next", "redirect", "return", "returnurl", "dest", "destination", "r", "u", "to", "continue"]
+    },
+    {
+      "vuln_class": "ssrf",
+      "title": "Server-Side Request Forgery",
+      "cwe": "CWE-918",
+      "owasp": "A10:2021-SSRF",
+      "severity": "high",
+      "non_destructive": true,
+      "methodology": "URL-accepting server-side fetch parameters should be tested with an out-of-band (OOB) collector canary; confirmation requires observing the inbound request at the collector. Without an OOB listener a scanner can only flag the surface — mark for OOB validation.",
+      "payloads": ["http://qannas-oob.invalid/", "http://169.254.169.254/latest/meta-data/"],
+      "detect_signatures": [],
+      "param_hints": ["url", "uri", "path", "callback", "webhook", "fetch", "image", "src", "proxy", "dest"]
+    },
+    {
+      "vuln_class": "ssti",
+      "title": "Server-Side Template Injection",
+      "cwe": "CWE-1336",
+      "owasp": "A03:2021-Injection",
+      "severity": "high",
+      "non_destructive": true,
+      "methodology": "Inject a math marker the template engine would evaluate (e.g. {{7*7}} -> 49). A reflected '49' where the literal was sent proves evaluation. Keep payloads arithmetic-only; never call engine internals.",
+      "payloads": ["{{7*7}}", "${7*7}", "#{7*7}", "<%= 7*7 %>"],
+      "detect_signatures": ["49"],
+      "param_hints": ["name", "template", "q", "search", "message", "title", "content"]
+    },
+    {
+      "vuln_class": "path_traversal",
+      "title": "Path Traversal / LFI",
+      "cwe": "CWE-22",
+      "owasp": "A01:2021-Broken Access Control",
+      "severity": "high",
+      "non_destructive": true,
+      "methodology": "File/path parameters may allow traversal. Request a well-known read-only file via traversal sequences and look for its signature in the response. Read-only probing only; never write or include remote resources.",
+      "payloads": ["../../../../etc/passwd", "....//....//etc/passwd", "%2e%2e%2f%2e%2e%2fetc%2fpasswd"],
+      "detect_signatures": ["root:x:0:0:", "daemon:x:"],
+      "param_hints": ["file", "path", "page", "doc", "template", "include", "download", "name"]
+    },
+    {
+      "vuln_class": "security_headers",
+      "title": "Missing Security Headers",
+      "cwe": "CWE-693",
+      "owasp": "A05:2021-Security Misconfiguration",
+      "severity": "low",
+      "non_destructive": true,
+      "methodology": "Inspect the origin's response for the baseline hardening headers. This is an origin-level property — report once per origin, not per URL.",
+      "payloads": [],
+      "detect_signatures": ["content-security-policy", "x-frame-options", "strict-transport-security", "x-content-type-options"],
+      "param_hints": []
+    }
+  ]
+}
