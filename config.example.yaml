@@ -1,0 +1,51 @@
+# Qannas configuration — copy to config.yaml and edit.
+#
+# AUTHORIZATION IS MANDATORY. Qannas refuses any target not matched by an
+# entry under `scope`. You are responsible for having written permission to
+# test every host listed here. See README "Authorized use only".
+
+llm:
+  # Any litellm-supported model string. Examples:
+  #   openrouter/z-ai/glm-5.3   openai/gpt-5.4   anthropic/claude-sonnet-4-6
+  # Leave model as "mock" to run the full loop offline with a deterministic
+  # stub model (no API key, no network) — useful for testing the pipeline.
+  model: "mock"
+  api_key_env: "LLM_API_KEY"      # name of the env var holding your key
+  api_base_env: "LLM_API_BASE"    # optional, for local models (Ollama/LMStudio)
+  temperature: 0.2
+  max_tokens: 2048
+
+scope:
+  # Exact hostnames, wildcard domains, or CIDR ranges you are authorized to test.
+  authorized:
+    - "localhost"
+    - "127.0.0.1"
+    - "*.example.com"       # wildcard: matches app.example.com, api.example.com ...
+    - "192.168.56.0/24"     # a lab CIDR
+  # Hosts never touched even if they slip into authorized (defense in depth).
+  blocked:
+    - "*.gov"
+    - "*.mil"
+
+engine:
+  max_iterations: 40          # hard cap on the main loop
+  max_requests_per_endpoint: 25
+  request_timeout: 15
+  rate_limit_per_sec: 4       # be a good citizen even on your own box
+  runs_dir: "qannas_runs"     # results written here, one dir per run
+
+# Which vulnerability classes the exploit agent is allowed to probe.
+# Everything here is detection/validation oriented and non-destructive by default.
+vuln_classes:
+  - "reflected_xss"
+  - "sql_injection"
+  - "idor"
+  - "open_redirect"
+  - "ssrf"
+  - "security_headers"
+
+sandbox:
+  # Docker image used to run generated proof-of-concept scripts in isolation.
+  enabled: false
+  image: "python:3.12-slim"
+  network: "none"             # PoCs that need no network run fully isolated
