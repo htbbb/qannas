@@ -14,7 +14,12 @@ class ReconAgent:
         bb = self.ctx.bb
         for target in bb.targets:
             try:
-                endpoints = self.recon.crawl(target, max_pages=20)
+                if self.ctx.browser is not None:
+                    # Browser recon renders the SPA and captures XHR/fetch API calls.
+                    endpoints = self.ctx.browser.crawl(target, max_pages=15)
+                    bb.note(f"browser recon: {target} -> {len(endpoints)} endpoints")
+                else:
+                    endpoints = self.recon.crawl(target, max_pages=20)
             except Exception as e:  # scope violations included — recorded, not fatal
                 bb.note(f"recon failed for {target}: {e}")
                 continue

@@ -17,3 +17,4 @@ class AgentContext:
     llm: LLM
     http: HttpTool
     kb: KnowledgeBase | None = None
+    browser: object | None = None   # tools.browser.Browser when --browser is on

@@ -61,7 +61,8 @@ def cmd_scan(args) -> int:
     if not targets and not seed:
         console.print("[red]No targets given.[/]")
         return 2
-    orch = Orchestrator(cfg, targets, run_name=args.name, seed_endpoints=seed)
+    orch = Orchestrator(cfg, targets, run_name=args.name, seed_endpoints=seed,
+                        use_browser=args.browser)
     result = orch.run()
     return 1 if result["snapshot"]["confirmed"] else 0
 
@@ -116,6 +117,8 @@ def main(argv=None) -> int:
     s.add_argument("--target-list", help="file with one target per line")
     s.add_argument("--openapi", help="OpenAPI/Swagger file: test every declared endpoint")
     s.add_argument("--endpoints", help="plain text file, one 'METHOD url' per line")
+    s.add_argument("--browser", action="store_true",
+                   help="render SPAs with headless Chromium + test DOM XSS (needs playwright)")
     s.add_argument("--name", help="run name")
     s.set_defaults(func=cmd_scan)
 

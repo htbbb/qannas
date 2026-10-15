@@ -93,6 +93,7 @@ qannas/
   ctf.py            # ReAct CTF solver (flag regex = win signal)
   report.py         # JSON + Markdown + CSV reports (CWE/OWASP/remediation)
   viewer.py         # local web dashboard (qannas view)
+  tools/browser.py  # headless Chromium: SPA recon + DOM XSS (optional)
   orchestrator.py   # the main loop
   cli.py            # entrypoint
   tools/            # http (scope-checked), recon crawler, nuclei hook

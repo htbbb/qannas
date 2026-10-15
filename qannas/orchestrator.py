@@ -8,6 +8,7 @@ from rich.console import Console
 
 from .agents.ai_exploit import AIExploitAgent
 from .agents.base import AgentContext
+from .agents.dom_xss import DomXssAgent
 from .agents.recon import ReconAgent
 from .agents.validator import ValidatorAgent
 from .blackboard import Blackboard, Phase
@@ -24,8 +25,9 @@ console = Console()
 
 class Orchestrator:
     def __init__(self, cfg: Config, targets: list[str], run_name: str | None = None,
-                 seed_endpoints: list[dict] | None = None) -> None:
+                 seed_endpoints: list[dict] | None = None, use_browser: bool = False) -> None:
         self.cfg = cfg
+        self.use_browser = use_browser
         self.guard = ScopeGuard(cfg.scope)
         # Fail closed: refuse the whole run if any target is out of scope.
         for t in targets:
@@ -53,13 +55,29 @@ class Orchestrator:
         self.kb = KnowledgeBase()
         # If config lists no classes, test everything the knowledge base knows.
         classes = cfg.vuln_classes or self.kb.classes()
+        # dom_xss needs a browser; drop it unless browser mode is on.
+        if not use_browser:
+            classes = [c for c in classes if c != "dom_xss"]
         self.ctx = AgentContext(cfg=cfg, bb=self.bb, llm=llm, http=http, kb=self.kb)
         self.planner = Planner(classes, cfg.engine.max_iterations)
         self.recon = ReconAgent(self.ctx)
         self.exploit = AIExploitAgent(self.ctx)
+        self.dom_xss = DomXssAgent(self.ctx)
         self.validator = ValidatorAgent(self.ctx)
 
     def run(self) -> dict:
+        from .tools import browser as browsermod
+        if self.use_browser and browsermod.available():
+            with browsermod.Browser(self.guard) as br:
+                self.ctx.browser = br
+                console.print("[cyan]browser mode on[/] · headless Chromium, scope-gated")
+                return self._run_loop()
+        if self.use_browser:
+            console.print("[yellow]browser mode requested but Playwright/Chromium missing — "
+                          "falling back to HTTP crawler. Install: pip install playwright && playwright install chromium[/]")
+        return self._run_loop()
+
+    def _run_loop(self) -> dict:
         console.print(f"[bold cyan]Qannas[/] starting on {', '.join(self.bb.targets)}")
         console.print(f"[dim]run dir: {self.bb.run_dir}[/]")
         while True:
@@ -68,7 +86,10 @@ class Orchestrator:
                 self.recon.run()
             elif action.kind == "exploit":
                 console.print(f"[yellow]exploit[/] · {action.detail}")
-                self.exploit.run(action.detail)
+                if action.detail == "dom_xss":
+                    self.dom_xss.run(action.detail)
+                else:
+                    self.exploit.run(action.detail)
             elif action.kind == "validate":
                 console.print("[magenta]validate[/] · reproducing candidates")
                 self.validator.run()

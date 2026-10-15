@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "playbooks": [
     {
       "vuln_class": "reflected_xss",
@@ -233,6 +233,37 @@
       ],
       "param_hints": [],
       "remediation": "Add Content-Security-Policy, X-Frame-Options (or CSP frame-ancestors), Strict-Transport-Security, and X-Content-Type-Options at the edge/app for every response."
+    },
+    {
+      "vuln_class": "dom_xss",
+      "title": "DOM / Client-Side Cross-Site Scripting",
+      "cwe": "CWE-79",
+      "owasp": "A03:2021-Injection",
+      "severity": "high",
+      "non_destructive": true,
+      "methodology": "Render the page in a real browser and inject marker payloads that trigger a JS handler (onerror/onload) setting a canary, or an alert dialog. Confirmation requires actual script EXECUTION in the DOM, not mere reflection — far lower false positives than source-reflection checks.",
+      "payloads": [
+        "\"><img src=x onerror=\"window.__QXSS__='qnx'\">",
+        "'><img src=x onerror=\"window.__QXSS__='qnx'\">",
+        "\"><svg onload=\"window.__QXSS__='qnx'\">",
+        "<img src=x onerror=\"window.__QXSS__='qnx'\">",
+        "javascript:window.__QXSS__='qnx'"
+      ],
+      "detect_signatures": [],
+      "param_hints": [
+        "q",
+        "query",
+        "search",
+        "s",
+        "name",
+        "message",
+        "comment",
+        "redirect",
+        "returnurl",
+        "lang",
+        "id"
+      ],
+      "remediation": "Encode data for the DOM context at the sink, avoid dangerous sinks (innerHTML, document.write, eval), use textContent/safe framework bindings, and enforce a strict Content-Security-Policy."
     }
   ]
 }

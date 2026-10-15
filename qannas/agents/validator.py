@@ -36,6 +36,12 @@ class ValidatorAgent:
         if f.vuln_class in HEURISTIC_CLASSES:
             return "needs_human", f.evidence + " (manual auth-context check required)"
 
+        if f.vuln_class == "dom_xss":
+            if self.ctx.browser is None or not f.poc:
+                return "needs_human", f.evidence + " (re-run with --browser to confirm)"
+            ok, ev = self.ctx.browser.check_executes(f.poc.replace("GET ", ""))
+            return ("confirmed", ev) if ok else ("rejected", ev)
+
         if f.vuln_class == "security_headers":
             r = self.ctx.http.get(f.endpoint)
             still = [h for h in ("content-security-policy", "x-frame-options",
