@@ -1,0 +1,13 @@
+# Example endpoints list for: qannas scan -t http://127.0.0.1:3000 --endpoints examples_endpoints.txt
+# Format: "METHOD url" (or just "url", defaults to GET). Relative paths resolve
+# against the -t target. Query params are picked up and tested.
+#
+# These are OWASP Juice Shop REST paths — the real attack surface a crawler
+# can't see on an Angular SPA. Test ONLY an instance you are authorized to test.
+GET /rest/products/search?q=apple
+GET /api/Products?id=1
+GET /rest/track-order?id=1
+GET /rest/user/whoami
+GET /api/Feedbacks
+GET /api/Users?id=1
+GET /rest/products/1/reviews
