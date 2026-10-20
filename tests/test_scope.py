@@ -142,3 +142,22 @@ def test_metadata_endpoint_literal_out_of_scope():
 
 def test_resolve_dns_defaults_true():
     assert ScopeConfig(authorized=["x"]).resolve_dns is True
+
+
+# ---------------------------------------------------------------------------
+# Explicit coverage for the early-return denial paths in _denial_reason.
+# ---------------------------------------------------------------------------
+def test_target_without_host_is_rejected():
+    g = dns_guard(["*.example.com"])
+    # No parseable host (empty authority) -> denied, never resolved.
+    assert not g.is_authorized("http:///nohost")
+    with pytest.raises(ScopeViolation, match="could not parse a host"):
+        g.check("http:///nohost")
+
+
+def test_blocked_entry_is_rejected():
+    g = dns_guard(["*.example.com"], blocked=["evil.example.com"])
+    # In-scope by wildcard, but the blocklist wins before any resolution.
+    assert not g.is_authorized("https://evil.example.com/")
+    with pytest.raises(ScopeViolation, match="blocked"):
+        g.check("https://evil.example.com/")
