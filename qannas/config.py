@@ -30,6 +30,10 @@ class LLMConfig:
 class ScopeConfig:
     authorized: list[str] = field(default_factory=list)
     blocked: list[str] = field(default_factory=list)
+    # Resolve hostnames and reject targets that land on internal / private /
+    # loopback addresses unless that address (or a covering CIDR) is itself
+    # authorized. Turn off for offline runs with no DNS (e.g. the mock pipeline).
+    resolve_dns: bool = True
 
 
 @dataclass

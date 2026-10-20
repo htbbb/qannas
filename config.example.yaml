@@ -26,6 +26,11 @@ scope:
   blocked:
     - "*.gov"
     - "*.mil"
+  # Resolve hostnames and refuse any that land on an internal / private /
+  # loopback / reserved address unless that address (or a covering CIDR) is
+  # listed under `authorized` above. This blocks SSRF / DNS-rebinding paths out
+  # of scope. Set to false only for offline runs where DNS is unavailable.
+  resolve_dns: true
 
 engine:
   max_iterations: 40          # hard cap on the main loop
