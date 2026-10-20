@@ -161,3 +161,14 @@ def test_blocked_entry_is_rejected():
     assert not g.is_authorized("https://evil.example.com/")
     with pytest.raises(ScopeViolation, match="blocked"):
         g.check("https://evil.example.com/")
+
+
+def test_private_resolution_goes_through_denial_reason(monkeypatch):
+    # Regression guard: _denial_reason must flow past the authorized check into
+    # the IP inspection and return a *string reason*, never a bool or None.
+    monkeypatch.setattr(scope_mod, "_lookup", _fake_lookup({"app.example.com": ["10.0.0.5"]}))
+    g = dns_guard(["*.example.com"])
+    reason = g._denial_reason("https://app.example.com/")
+    assert isinstance(reason, str)
+    assert "internal address" in reason
+    assert reason not in (None, True, False)
