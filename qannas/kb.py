@@ -46,8 +46,12 @@ class KnowledgeBase:
     def __init__(self, db_path: str | Path | None = None) -> None:
         self.path = Path(db_path) if db_path else (Path.home() / ".qannas" / "kb.sqlite")
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(str(self.path))
+        # Each thread in a parallel scan builds its own KnowledgeBase, so several
+        # connections hit this one file at once. timeout= sets SQLite's busy
+        # handler so a blocked connection waits instead of raising immediately.
+        self.conn = sqlite3.connect(str(self.path), timeout=5.0)
         self.conn.row_factory = sqlite3.Row
+        self._configure_connection()
         self._init_schema()
         # Seed on first use, and RE-seed (upsert) whenever the shipped seed
         # version is newer than what's stored — so KB updates reach an existing
@@ -56,6 +60,32 @@ class KnowledgeBase:
         if not self._count("playbooks") or shipped > self._stored_version():
             self.seed()
             self._set_meta("seed_version", str(shipped))
+
+    def _configure_connection(self) -> None:
+        """Make concurrent access safe for parallel scans sharing this file.
+
+        WAL lets readers and a single writer proceed at the same time (the
+        default rollback journal serializes them and is what produces
+        "database is locked"); busy_timeout makes a blocked writer wait up to
+        5s rather than failing instantly; synchronous NORMAL is the recommended,
+        durable pairing with WAL.
+
+        busy_timeout is set first so it covers the ordinary read/write
+        contention. Switching the journal mode itself needs a brief exclusive
+        lock that busy_timeout does NOT cover, so when several threads open the
+        fresh DB at once the flip can come back BUSY; we retry briefly until WAL
+        is in effect (the first connection to win makes it a no-op for the rest).
+        """
+        self.conn.execute("PRAGMA busy_timeout=5000")
+        for _ in range(100):
+            try:
+                mode = self.conn.execute("PRAGMA journal_mode=WAL").fetchone()[0]
+                if str(mode).lower() == "wal":
+                    break
+            except sqlite3.OperationalError:
+                pass
+            time.sleep(0.02)
+        self.conn.execute("PRAGMA synchronous=NORMAL")
 
     def _init_schema(self) -> None:
         self.conn.executescript(
